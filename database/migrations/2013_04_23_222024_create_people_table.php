@@ -16,15 +16,18 @@ class CreatePeopleTable extends Migration
         Schema::create('persons', function (Blueprint $table) {
             $table->id();
             $table->string("name", 150);
-            $table->string("address", 100)->nullable();
-            $table->string("lat", 30)->nullable();
-            $table->string("lng", 30)->nullable();
+
+            $table->string("address_a", 100)->nullable();
+            $table->string("lat_a", 30)->nullable();
+            $table->string("lng_a", 30)->nullable();
+            $table->string("ref_a", 50)->nullable();
 
             $table->string("address_b", 100)->nullable();
             $table->string("lat_b")->nullable();
             $table->string("lng_b")->nullable();
+            $table->string("ref_b", 50)->nullable();
 
-            $table->string("phone", 13)->nullable();
+            $table->string("phone_a", 13)->nullable();
             $table->string("phone_b", 13)->nullable();
             $table->string("fb", 100)->nullable();
 

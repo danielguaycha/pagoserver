@@ -4,10 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Person;
 use App\Role;
-use App\Ruta;
 use App\Traits\TokenTrait;
 use App\User;
-use App\Zone;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
