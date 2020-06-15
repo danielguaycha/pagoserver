@@ -6,7 +6,6 @@
         <option value="activate" />
         <option value="organizeImports" />
         <option value="reformatChangedCode" />
-        <option value="rearrange" />
       </set>
     </option>
   </component>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\ApiController;
+use App\Payment;
 use App\Person;
 use App\Traits\UploadTrait;
 use Illuminate\Http\Request;
@@ -42,10 +43,12 @@ class ClientController extends ApiController
         $p->phone_b = $request->phone_b;
         // dirección personal
         $p->address_a = $request->address_a;
+        $p->city_a = $request->city_a;
         $p->lat_a = $request->lat_a;
         $p->lng_a = $request->lng_a;
         // dirección de trabajo
         $p->address_b = $request->address_b;
+        $p->city_b = $request->city_b;
         $p->lat_b = $request->lat_b;
         $p->lng_b = $request->lng_b;
 
@@ -64,12 +67,6 @@ class ClientController extends ApiController
         return $this->showOne($p);
     }
 
-    public function messages() {
-        return [
-            'name.required' => 'El nombre del cliente es requerido',
-        ];
-    }
-
     public function list(Request $request) {
         $limit = 20;
         // limite
@@ -83,10 +80,6 @@ class ClientController extends ApiController
             ->orderBy('created_at', 'desc')->get();
 
         return $this->showAll($p);
-    }
-
-    public function selectFields() {
-        return ['id', 'name', 'address_a', 'address_b', 'status'];
     }
 
     public function search(Request $request) {
@@ -104,5 +97,45 @@ class ClientController extends ApiController
             return $this->showAll($p);
         }
         return $this->showAll(null);
+    }
+
+    public function history(Request $request)
+    {
+        $persons = Person::leftJoin('credits', 'credits.person_id', 'persons.id')
+            ->where([
+                ['persons.user_id', $request->user()->id],
+            ])
+            ->select('persons.id', 'persons.name', 'persons.rank', 'persons.city_a', 'persons.address_a',
+                'persons.city_b', 'persons.address_b', 'persons.status', 'credits.cobro',
+                'credits.id as credit', 'credits.f_inicio', 'credits.f_fin', 'credits.total')
+            ->orderBy('credits.created_at', 'desc')
+            ->limit(20)
+            ->get();
+
+        for ($i = 0; $i < count($persons); $i++) {
+            if ($persons[$i]->credit !== null)
+                $persons[$i]->paid = Payment::where('credit_id', $persons[$i]->credit)
+                    ->where('status', Payment::STATUS_PAID)->sum('total');
+            else
+                $persons[$i]->paid = 0;
+        }
+
+        return $this->showAll($persons);
+    }
+
+    //* Functions
+
+    public function selectFields()
+    {
+        return ['id', 'name', 'address_a', 'address_b',
+            'status', 'rank', 'phone_a', 'phone_b', 'city_a', 'city_b'];
+    }
+
+    // Messages Error
+    public function messages()
+    {
+        return [
+            'name.required' => 'El nombre del cliente es requerido',
+        ];
     }
 }

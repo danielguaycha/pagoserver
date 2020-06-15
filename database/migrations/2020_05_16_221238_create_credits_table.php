@@ -31,9 +31,10 @@ class CreateCreditsTable extends Migration
             $table->double('pagos_de_last', 10, 2)->default(0);
             $table->integer('n_pagos')->default(0);
 
-            $table->bigInteger('zone_id')->unsigned();
+            $table->bigInteger('zone_id')->unsigned()->nullable();
             $table->bigInteger('person_id')->unsigned();
             $table->bigInteger('user_id')->unsigned();
+            $table->bigInteger('guarantor_id')->unsigned()->nullable();
 
             $table->date('f_inicio')->nullable();
             $table->date('f_fin')->nullable();
@@ -45,6 +46,7 @@ class CreateCreditsTable extends Migration
             $table->foreign('zone_id')->references('id')->on('zones');
             $table->foreign('user_id')->references('id')->on('users');
             $table->foreign('person_id')->references('id')->on('persons');
+            $table->foreign('guarantor_id')->references('id')->on('persons');
         });
     }
 

@@ -11,5 +11,13 @@ Route::get('user', 'AuthController@user');
 Route::namespace('Api')->group(function () {
     Route::get('client/list', 'ClientController@list');
     Route::get('client/search', 'ClientController@search');
+    Route::get('client/history', 'ClientController@history');
     Route::apiResource('client', 'ClientController');
+
+    // credits
+    Route::resource('credit', 'CreditController');
+
+    // payments
+    Route::get('payment/only/{id}', 'PaymentController@showByCredit');
+    Route::apiResource('payment', 'PaymentController')->only(['index', 'show', 'update', 'destroy']);
 });

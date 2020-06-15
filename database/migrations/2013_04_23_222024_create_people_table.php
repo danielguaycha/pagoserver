@@ -18,13 +18,15 @@ class CreatePeopleTable extends Migration
             $table->string("name", 150);
 
             $table->string("address_a", 100)->nullable();
-            $table->string("lat_a", 30)->nullable();
-            $table->string("lng_a", 30)->nullable();
+            $table->string('city_a', 50)->nullable();
+            $table->double("lat_a")->nullable();
+            $table->double("lng_a")->nullable();
             $table->string("ref_a", 50)->nullable();
 
             $table->string("address_b", 100)->nullable();
-            $table->string("lat_b")->nullable();
-            $table->string("lng_b")->nullable();
+            $table->string('city_b', 50)->nullable();
+            $table->double("lat_b")->nullable();
+            $table->double("lng_b")->nullable();
             $table->string("ref_b", 50)->nullable();
 
             $table->string("phone_a", 13)->nullable();
@@ -33,7 +35,7 @@ class CreatePeopleTable extends Migration
 
             $table->integer("status")->default(1);
             $table->string("type", 25)->default(\App\Person::TYPE_CLIENT);
-
+            $table->integer('rank')->default(100);
 
             $table->timestamps();
         });

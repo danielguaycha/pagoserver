@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Credit;
-use App\Http\Controllers\Controller;
+use App\Http\Controllers\ApiController;
 use App\Payment;
 use App\Person;
 use App\Traits\UploadTrait;
@@ -11,9 +11,14 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-class CreditController extends Controller
+class CreditController extends ApiController
 {
     use UploadTrait;
+
+    public function __construct()
+    {
+        $this->middleware('auth:api');
+    }
 
     public function store(Request $request) {
 
@@ -30,13 +35,13 @@ class CreditController extends Controller
 
 
         if(!Person::find($request->get('person_id'))) {
-            return 'El cliente seleccionado no existe';
+            return $this->err('El cliente seleccionado no existe');
         }
 
         DB::beginTransaction();
 
         if($this->hasActiveCredit($request->get('person_id'))){
-            return "Este cliente ya tiene un crédito activo";
+            return $this->err("Este cliente ya tiene un crédito activo");
         }
 
         $c = new Credit();
@@ -49,49 +54,24 @@ class CreditController extends Controller
         $c->person_id = $request->get('person_id');
         $c->user_id = $request->user()->id;
         $c->zone_id = $request->user()->zone_id;
+        $c->guarantor_id = $request->guarantor_id;
 
-        //prenda
-        if($request->hasFile('prenda_img')){
+        if ($request->hasFile('prenda_img')) {
             $c->prenda_img = $this->uploadOne($request->file('prenda_img'), '/prenda', 'public');
         }
         $c->prenda_detail = $request->get('prenda_detail');
 
-        // fechas
-        if(!$request->get('f_inicio')) {
+        // CALCULO DE VALORES Y FECHAS
+        $c->calcular();
 
-            $finicio = Credit::diasInicio($c->cobro);
-
-            $c->f_inicio = $finicio->format('Y-m-d');
-            $c->f_fin = Credit::dateEnd(Credit::diasPlazo($c->plazo), $finicio)->format('Y-m-d');
-
-        }
-        else{
-            $finicio = Credit::diasInicio($c->cobro, $request->get('f_inicio'));
-
-            $c->f_inicio = $finicio->format('Y-m-d');
-            $c->f_fin = Credit::dateEnd(Credit::diasPlazo($c->plazo), $finicio)->format('Y-m-d');
-        }
-
-        // Cálculos
-        $c->total_utilidad = ($c->monto * ($c->utilidad/100)); // utilidad
-        $c->total = $c->monto + $c->total_utilidad; // total con utilidad
-
-        //
-        $calc = $this->calcCredit($c->plazo, $c->total, $c->cobro);
-
-        $c->pagos_de = $calc['pagosDe']; // pagos de $
-        $c->pagos_de_last = $calc['pagosDeLast']; // ultimo pago de $
-        $c->description = $calc['description']; // descripción
-        $c->n_pagos = $calc['nPagos'];
-
-
-        if($c->save()) {
-            $this->storePayments($c->id, $calc, $c->f_inicio, $c->f_fin, $c->cobro);
+        if ($c->save()) {
+            //$this->storePayments($c->id, $calc, $c->f_inicio, $c->f_fin, $c->cobro);
+            $this->setPayments($c);
             DB::commit();
-            return $c;
+            return $this->showOne($c);
         } else {
             DB::rollBack();
-            return "No se ha podido procesar el crédito";
+            return $this->err("No se ha podido procesar el crédito");
         }
     }
 
@@ -124,8 +104,6 @@ class CreditController extends Controller
         ];
     }
 
-    // functions
-
     public function  hasActiveCredit($person_id) {
         $c = Credit::select('id')->where([
             ['person_id', $person_id],
@@ -133,6 +111,40 @@ class CreditController extends Controller
         ])->first();
 
         return ($c!=null);
+    }
+
+    // functions
+
+    public function setPayments(Credit $c)
+    {
+        $nPagos = count($c->pays);
+
+        if ($c->pagos_de_last !== 0) {
+            $nPagos = $nPagos - 1;
+        }
+
+        for ($i = 0; $i < $nPagos; $i++) {
+            Payment::create([
+                'number' => ($i + 1),
+                'credit_id' => $c->id,
+                'total' => $c->pagos_de,
+                'status' => Payment::STATUS_ACTIVE,
+                'date' => $c->pays[$i],
+                'description' => 'Pendiente'
+            ]);
+        }
+
+        if ($c->pagos_de_last !== 0) {
+            $np = count($c->pays);
+            Payment::create([
+                'number' => $np,
+                'credit_id' => $c->id,
+                'total' => $c->pagos_de_last,
+                'status' => Payment::STATUS_ACTIVE,
+                'date' => $c->pays[$np - 1],
+                'description' => 'Pendiente'
+            ]);
+        }
     }
 
     public function calcCredit($plazo, $mount, $cobro) {
