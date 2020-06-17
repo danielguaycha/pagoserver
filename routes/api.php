@@ -12,7 +12,8 @@ Route::namespace('Api')->group(function () {
     Route::get('client/list', 'ClientController@list');
     Route::get('client/search', 'ClientController@search');
     Route::get('client/history', 'ClientController@history');
-    Route::apiResource('client', 'ClientController');
+    Route::post('client/{id}', 'ClientController@update');
+    Route::apiResource('client', 'ClientController')->except(['update']);
 
     // credits
     Route::resource('credit', 'CreditController');
