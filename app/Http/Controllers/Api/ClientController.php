@@ -196,9 +196,13 @@ class ClientController extends ApiController
     public function show($id)
     {
         $c = Person::findOrFail($id);
-
+        if ($c->ref_a)
+            $c->ref_a = url('/api/image/' . $c->ref_a);
+        if ($c->ref_b)
+            $c->ref_b = url('/api/image/' . $c->ref_b);
         return $this->showOne($c);
     }
+
     //* Functions
 
     public function selectFields()
@@ -215,3 +219,4 @@ class ClientController extends ApiController
         ];
     }
 }
+

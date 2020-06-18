@@ -22,3 +22,4 @@ Route::namespace('Api')->group(function () {
     Route::get('payment/only/{id}', 'PaymentController@showByCredit');
     Route::apiResource('payment', 'PaymentController')->only(['index', 'show', 'update', 'destroy']);
 });
+Route::get('image/{path}/{filename}', 'AdminController@viewImg')->name('show-image');

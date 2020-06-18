@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
+    <data-source source="LOCAL" name="pagosdb@localhost" uuid="8bc02ad9-1921-4f7c-bd6c-cbaec0760df0">
+      <driver-ref>mysql.8</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>com.mysql.cj.jdbc.Driver</jdbc-driver>
+      <jdbc-url>jdbc:mysql://localhost:3306/pagosdb</jdbc-url>
+      <driver-properties>
+        <property name="serverTimezone" value="America/Guayaquil" />
+      </driver-properties>
+    </data-source>
+  </component>
+</project>
