@@ -13,10 +13,129 @@ use Illuminate\Support\Str;
 class PaymentController extends ApiController
 {
 
-    public function __construct() {
+    public function __construct()
+    {
         $this->middleware("auth:api");
     }
 
+    // payments - cobros
+    public function listByCredit($creditId)
+    {
+        $credit = Credit::join('persons', 'persons.id', 'credits.person_id')
+            ->select('persons.name',
+                'credits.id', 'credits.f_inicio', 'credits.f_fin',
+                'credits.total', 'credits.status')
+            ->where('credits.id', $creditId)->first();
+
+        $payments = Payment::select('id', 'abono', 'status', 'mora', 'date', 'number')
+            ->where('credit_id', $creditId)->orderBy('date', 'asc')->get();
+
+        $totales = $payments->where('status', Payment::STATUS_PAID)->sum('abono');
+        $credit->total_pagado = $totales;
+        $credit->payments = $payments;
+
+        return $this->data($credit);
+    }
+
+    public function pay(Request $request, $creditId)
+    {
+        $request->validate(['pays' => 'array|required']);
+
+        $c = Credit::find($creditId);
+        if (!$c) {
+            return $this->err("El crédito no existe");
+        }
+
+        $count = 0;
+        foreach ($request->pays as $r) {
+            $pay = Payment::find($r['pay']);
+            if ($pay) {
+                $pay->status = Payment::STATUS_PAID;
+                $count++;
+                $pay->save();
+            }
+        }
+        return $this->success("$count pagos procesados");
+    }
+
+    public function abono(Request $request, $creditId)
+    {
+        $request->validate(['abono' => 'required']);
+
+        $c = Credit::find($creditId);
+        if (!$c) {
+            return $this->err("El crédito no existe");
+        }
+
+        $lastPay = $this->lastPay($creditId);
+
+
+        // calculo de pagos aun no procesados
+        $abono = doubleval($request->abono);
+        $cuota = $lastPay->total;
+        $userId = $request->user()->id;
+
+        /*$moras = Payment::where([
+            ['credit_id', $creditId],
+            ['mora', true]
+        ])->select('total', 'abono')->get();
+
+        return $this->ok($moras);*/
+
+
+        // si es menor, puede ser que sea un atraso
+        if ($abono < $cuota) {
+            $this->savePay($userId, $creditId, $abono, true);
+        } else if ($abono > $cuota) {
+            $nPagos = $abono / $cuota; // numero de pagos
+            for ($i = 0; $i < intval($nPagos); $i++) {
+                if ($i === 0) {
+                    $tempAbono = intval($nPagos) * $cuota;
+                    $abono = $abono - $tempAbono;
+                    $this->savePay($userId, $creditId, $tempAbono);
+                } else {
+                    $this->savePay($userId, $creditId, 0);
+                }
+            }
+            if ($abono > 0) {
+                $this->savePay($userId, $creditId, $abono);
+            }
+        } else {
+            $this->savePay($userId, $creditId);
+        }
+
+        return $this->success("Pago procesado con éxito!");
+    }
+
+    private function savePay($userId, $creditId, $abono = null, $mora = false)
+    {
+        $p = $this->lastPay($creditId);
+        $p->status = Payment::STATUS_PAID;
+        if ($abono !== null) {
+            $p->abono = $abono;
+        }
+        if ($mora) {
+            $p->mora = 1;
+            $p->dias_mora = 1;
+            $p->description = "COBRO CON MORA";
+        } else {
+            $p->description = "COBRO EXITOSO";
+        }
+        $p->user_id = $userId;
+        $p->date_payment = Carbon::now();
+        $p->save();
+    }
+
+    private function lastPay($creditId)
+    {
+        return Payment::where([
+            ['status', '<>', Payment::STATUS_PAID],
+            ['credit_id', $creditId]
+        ])->orderBy('id', 'asc')->first();
+    }
+
+
+    // old code
     public function index(Request $request)
     {
         $date = Carbon::now()->format('Y-m-d');
@@ -24,18 +143,24 @@ class PaymentController extends ApiController
         $src = '';
 
         // validar los query's de date (Fecha del cobro), only(Solo un tipo de plazo de cobro), src (Para mapas)
-        if($request->query('date')) {$date = $request->query('date');}
-        if($request->query('only')) {$only = Str::lower($request->query('only'));}
-        if($request->query('src')) { $src = Str::lower($request->query('src'));}
+        if ($request->query('date')) {
+            $date = $request->query('date');
+        }
+        if ($request->query('only')) {
+            $only = Str::lower($request->query('only'));
+        }
+        if ($request->query('src')) {
+            $src = Str::lower($request->query('src'));
+        }
 
 
-        if($only === 'all') { // en caso de que quieran todos los plazos
+        if ($only === 'all') { // en caso de que quieran todos los plazos
 
             return $this->showAll($this->getPayments($date, Credit::COBRO_DIARIO, $src, true));
         }
 
         // en caso de que el plazo sea uno en especifico
-        if($only === 'diario') {
+        if ($only === 'diario') {
             return $this->ok(['diario' => $this->getPayments($date, Credit::COBRO_DIARIO, $src)]);
         }
 

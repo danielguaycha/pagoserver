@@ -24,44 +24,44 @@ class Credit extends Model
 
     public $timestamps = false;
 
-    public $f_inicio;
-    public $f_fin;
-    public $plazo;
-    public $cobro;
-    public $total_utilidad;
-    public $total;
-    public $pagos_de;
-    public $pagos_de_last;
-    public $monto;
-    public $utilidad;
+    public $_fInicio;
+    public $_fFin;
+    public $_plazo;
+    public $_cobro;
+    public $_totalUtilidad;
+    public $_total;
+    public $_pagosDe;
+    public $_pagosDeLast;
+    public $_monto;
+    public $_utilidad;
 
-    public $n_pagos;
+    public $_nPagos;
     public $pays = [];
 
     public function calcular()
     {
 
-        if (!$this->monto || !$this->utilidad) return;
-        if ($this->monto <= 0) return;
-        $this->total_utilidad = $this->monto * ($this->utilidad / 100);
-        $this->total = $this->monto + $this->total_utilidad;
-        $this->pagos_de_last = 0;
+        if (!$this->_monto || !$this->_utilidad) return;
+        if ($this->_monto <= 0) return;
+        $this->_totalUtilidad = $this->_monto * ($this->_utilidad / 100);
+        $this->_total = $this->_monto + $this->_totalUtilidad;
+        $this->_pagosDeLast = 0;
 
-        if ($this->plazo == null || $this->cobro == null)
+        if ($this->_plazo == null || $this->_cobro == null)
             return;
 
-        $this->n_pagos = intval($this->diasPlazo() / $this->diasCobro());
-        $this->pagos_de = round(($this->total / $this->n_pagos), 2);
+        $this->_nPagos = intval($this->diasPlazo() / $this->diasCobro());
+        $this->_pagosDe = round(($this->_total / $this->_nPagos), 2);
 
-        $totalIdeal = $this->pagos_de * $this->n_pagos;
+        $totalIdeal = $this->_pagosDe * $this->_nPagos;
 
-        if ($totalIdeal !== $this->total) {
-            if ($totalIdeal < $this->total) {
-                $diferencia = $this->total - $totalIdeal;
-                $this->pagos_de_last = $this->pagos_de + $diferencia;
+        if ($totalIdeal !== $this->_total) {
+            if ($totalIdeal < $this->_total) {
+                $diferencia = $this->_total - $totalIdeal;
+                $this->_pagosDeLast = $this->_pagosDe + $diferencia;
             } else {
-                $diferencia = $totalIdeal - $this->total;
-                $this->pagos_de_last = $this->pagos_de - $diferencia;
+                $diferencia = $totalIdeal - $this->_total;
+                $this->_pagosDeLast = $this->_pagosDe - $diferencia;
             }
         }
 
@@ -71,8 +71,8 @@ class Credit extends Model
 
     public function diasPlazo()
     {
-        if ($this->plazo == null) return 0;
-        switch ($this->plazo) {
+        if ($this->_plazo == null) return 0;
+        switch ($this->_plazo) {
             case self::PLAZO_SEMANAL:
                 return $this->diasCobro() == 1 ? 6 : 7;
             case self::PLAZO_QUINCENAL:
@@ -88,8 +88,8 @@ class Credit extends Model
 
     public function diasCobro()
     {
-        if ($this->cobro == null) return 0;
-        switch ($this->cobro) {
+        if ($this->_cobro == null) return 0;
+        switch ($this->_cobro) {
             case self::COBRO_DIARIO:
                 return 1;
             case self::PLAZO_SEMANAL:
@@ -103,12 +103,12 @@ class Credit extends Model
 
     public function calculaFechas()
     {
-        if ($this->cobro === null || $this->plazo === null) {
-            $this->f_fin = null;
+        if ($this->_cobro === null || $this->_plazo === null) {
+            $this->_fFin = null;
             return;
         }
         $diasPlazo = $this->diasPlazo();
-        if ($this->cobro === self::COBRO_DIARIO) {
+        if ($this->_cobro === self::COBRO_DIARIO) {
             $diasPlazo = $diasPlazo - 1;
             $fIni = Carbon::now()->addDay();
             $fEnd = Carbon::now()->addDay();
@@ -121,26 +121,26 @@ class Credit extends Model
                 $fEnd = $newD;
             }
 
-            $this->f_inicio = $fIni;
-            $this->f_fin = $fEnd;
+            $this->_fInicio = $fIni;
+            $this->_fFin = $fEnd;
         } else {
-            $this->f_inicio = Carbon::now();
-            $this->f_fin = Carbon::now();
-            for ($i = 0; $i < $this->n_pagos; $i++) {
+            $this->_fInicio = Carbon::now();
+            $this->_fFin = Carbon::now();
+            for ($i = 0; $i < $this->_nPagos; $i++) {
                 $newD = null;
-                switch ($this->cobro) {
+                switch ($this->_cobro) {
                     case self::COBRO_SEMANAL:
-                        $newD = $this->remplaceWeekend($this->f_fin->addDays(7));
+                        $newD = $this->remplaceWeekend($this->_fFin->addDays(7));
                         break;
                     case self::COBRO_QUINCENAL:
-                        $newD = $this->remplaceWeekend($this->f_fin->addDays(14));
+                        $newD = $this->remplaceWeekend($this->_fFin->addDays(14));
                         break;
                     case self::COBRO_MENSUAL:
-                        $newD = $this->remplaceWeekend($this->f_fin->addMonth());
+                        $newD = $this->remplaceWeekend($this->_fFin->addMonth());
                         break;
                 }
                 $this->pays[] = $newD->format('Y-m-d');
-                $this->f_fin = $newD;
+                $this->_fFin = $newD;
             }
         }
     }
@@ -156,24 +156,24 @@ class Credit extends Model
 
     public function parseToModel()
     {
-        $this->attributes['f_inicio'] = $this->f_inicio;
-        $this->attributes['f_fin'] = $this->f_fin;
-        $this->attributes['plazo'] = $this->plazo;
-        $this->attributes['cobro'] = $this->cobro;
-        $this->attributes['total_utilidad'] = $this->total_utilidad;
-        $this->attributes['total'] = $this->total;
-        $this->attributes['pagos_de'] = $this->pagos_de;
-        $this->attributes['pagos_de_last'] = $this->pagos_de_last;
-        $this->attributes['monto'] = $this->monto;
-        $this->attributes['utilidad'] = $this->utilidad;
-        $this->attributes['n_pagos'] = $this->n_pagos;
+        $this->attributes['f_inicio'] = $this->_fInicio;
+        $this->attributes['f_fin'] = $this->_fFin;
+        $this->attributes['plazo'] = $this->_plazo;
+        $this->attributes['cobro'] = $this->_cobro;
+        $this->attributes['total_utilidad'] = $this->_totalUtilidad;
+        $this->attributes['total'] = $this->_total;
+        $this->attributes['pagos_de'] = $this->_pagosDe;
+        $this->attributes['pagos_de_last'] = $this->_pagosDeLast;
+        $this->attributes['monto'] = $this->_monto;
+        $this->attributes['utilidad'] = $this->_utilidad;
+        $this->attributes['n_pagos'] = $this->_nPagos;
 
-        if ($this->pagos_de_last === 0) {
-            $description = $this->n_pagos . ' pago(s) de ' . $this->pagos_de;
+        if ($this->_pagosDeLast === 0) {
+            $description = $this->_nPagos . ' pago(s) de ' . $this->_pagosDe;
         } else {
-            $description = ($this->n_pagos - 1) . ' pago(s) de ' . $this->pagos_de . ' + un pago de ' . $this->pagos_de_last;
+            $description = ($this->_nPagos - 1) . ' pago(s) de ' . $this->_pagosDe . ' + un pago de ' . $this->_pagosDeLast;
         }
-        $description .= ' | Plazo: ' . $this->plazo . ', Cobro: ' . $this->cobro;
+        $description .= ' | Plazo: ' . $this->_plazo . ', Cobro: ' . $this->_cobro;
 
         $this->attributes['description'] = $description;
     }

@@ -19,6 +19,10 @@ Route::namespace('Api')->group(function () {
     Route::resource('credit', 'CreditController');
 
     // payments
+    Route::get('pays/{creditId}', 'PaymentController@listByCredit');
+    Route::post("pay/{creditId}", 'PaymentController@pay');
+    Route::post("abono/{creditId}", 'PaymentController@abono');
+
     Route::get('payment/only/{id}', 'PaymentController@showByCredit');
     Route::apiResource('payment', 'PaymentController')->only(['index', 'show', 'update', 'destroy']);
 });

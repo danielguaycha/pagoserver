@@ -40,15 +40,15 @@ class CreditController extends ApiController
 
         DB::beginTransaction();
 
-        if($this->hasActiveCredit($request->get('person_id'))){
+        if ($this->hasActiveCredit($request->get('person_id'))) {
             return $this->err("Este cliente ya tiene un crédito activo");
         }
 
         $c = new Credit();
-        $c->monto = $request->get('monto');
-        $c->utilidad = $request->get('utilidad');
-        $c->plazo = $request->get('plazo');
-        $c->cobro = $request->get('cobro');
+        $c->_monto = $request->get('monto');
+        $c->_utilidad = $request->get('utilidad');
+        $c->_plazo = $request->get('plazo');
+        $c->_cobro = $request->get('cobro');
         $c->status = Credit::STATUS_ACTIVO;
 
         $c->person_id = $request->get('person_id');
@@ -119,7 +119,7 @@ class CreditController extends ApiController
     {
         $nPagos = count($c->pays);
 
-        if ($c->pagos_de_last !== 0) {
+        if ($c->_pagosDeLast !== 0) {
             $nPagos = $nPagos - 1;
         }
 
@@ -127,19 +127,21 @@ class CreditController extends ApiController
             Payment::create([
                 'number' => ($i + 1),
                 'credit_id' => $c->id,
-                'total' => $c->pagos_de,
+                'total' => $c->_pagosDe,
+                'abono' => $c->_pagosDe,
                 'status' => Payment::STATUS_ACTIVE,
                 'date' => $c->pays[$i],
                 'description' => 'Pendiente'
             ]);
         }
 
-        if ($c->pagos_de_last !== 0) {
+        if ($c->_pagosDeLast !== 0) {
             $np = count($c->pays);
             Payment::create([
                 'number' => $np,
                 'credit_id' => $c->id,
-                'total' => $c->pagos_de_last,
+                'total' => $c->_pagosDeLast,
+                'abono' => $c->_pagosDeLast,
                 'status' => Payment::STATUS_ACTIVE,
                 'date' => $c->pays[$np - 1],
                 'description' => 'Pendiente'

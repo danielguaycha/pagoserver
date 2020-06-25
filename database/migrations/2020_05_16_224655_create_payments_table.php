@@ -17,15 +17,17 @@ class CreatePaymentsTable extends Migration
             $table->bigIncrements('id');
             $table->integer('number')->default(0);
             $table->double('total', 12, 2);
+            $table->double('abono', 12, 2)->default(0);
             $table->bigInteger('credit_id')->unsigned();
             $table->bigInteger('user_id')->unsigned()->nullable();
             $table->integer('status')->default(\App\Payment::STATUS_ACTIVE);
 
             $table->date('date')->nullable();
 
-            $table->date('date_payment')->nullable();
+            $table->timestamp('date_payment')->nullable();
             $table->string('description', 100)->nullable();
             $table->boolean('mora')->default(false);
+            $table->integer('dias_mora')->default(0);
 
             $table->foreign('credit_id')->references('id')->on('credits');
             $table->foreign('user_id')->references('id')->on('users');
