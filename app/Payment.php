@@ -14,6 +14,6 @@ class Payment extends Model
 
     public $timestamps = false;
     protected $fillable = [
-        'credit_id', 'total', 'saldo', 'date', 'date_payment', 'description', 'number', 'abono'
+        'credit_id', 'total', 'saldo', 'date', 'date_payment', 'description', 'number', 'abono', 'user_id', 'status'
     ];
 }

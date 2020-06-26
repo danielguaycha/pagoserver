@@ -53,12 +53,15 @@ class ClientController extends ApiController
         $p->lat_b = $request->lat_b;
         $p->lng_b = $request->lng_b;
 
-        if($request->hasFile('ref_a')){
-            $p->ref_a = $this->uploadOne($request->file('ref_a'), '/client', 'public');
+
+        if ($request->hasFile('ref_a')) {
+            $p->ref_a = $this->uploadOne($request->file('ref_a'),
+                '/client', 'public', null, "refa-");
         }
 
-        if($request->hasFile('ref_b')){
-            $p->ref_b = $this->uploadOne($request->file('ref_b'), '/client', 'public');
+        if ($request->hasFile('ref_b')) {
+            $p->ref_b = $this->uploadOne($request->file('ref_b'),
+                '/client', 'public', null, "refb-");
         }
 
         $p->user_id = $request->user()->id;
@@ -120,14 +123,16 @@ class ClientController extends ApiController
             if (Storage::disk('public')->exists($p->ref_a)) {
                 Storage::disk('public')->delete($p->ref_a);
             }
-            $p->ref_a = $this->uploadOne($request->file('ref_a'), '/client', 'public');
+            $p->ref_a = $this->uploadOne($request->file('ref_a'),
+                '/client', 'public', null, "refa-");
         }
 
         if ($request->hasFile('ref_b')) {
             if (Storage::disk('public')->exists($p->ref_b)) {
                 Storage::disk('public')->delete($p->ref_b);
             }
-            $p->ref_b = $this->uploadOne($request->file('ref_b'), '/client', 'public');
+            $p->ref_b = $this->uploadOne($request->file('ref_b'),
+                '/client', 'public', null, "refb-");
         }
 
         if ($p->save()) {

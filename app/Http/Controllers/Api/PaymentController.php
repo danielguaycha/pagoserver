@@ -27,7 +27,7 @@ class PaymentController extends ApiController
                 'credits.total', 'credits.status')
             ->where('credits.id', $creditId)->first();
 
-        $payments = Payment::select('id', 'abono', 'status', 'mora', 'date', 'number')
+        $payments = Payment::select('id', 'abono', 'status', 'mora', 'date', 'number', 'dias_mora')
             ->where('credit_id', $creditId)->orderBy('date', 'asc')->get();
 
         $totales = $payments->where('status', Payment::STATUS_PAID)->sum('abono');
@@ -51,6 +51,9 @@ class PaymentController extends ApiController
             $pay = Payment::find($r['pay']);
             if ($pay) {
                 $pay->status = Payment::STATUS_PAID;
+                $pay->user_id = $request->user()->id;
+                $pay->date_payment = Carbon::now();
+                $pay->description = 'PAGO EXITOSO';
                 $count++;
                 $pay->save();
             }
@@ -67,10 +70,42 @@ class PaymentController extends ApiController
             return $this->err("El crédito no existe");
         }
 
+        //* Valida si el crédito ya se ha terminado de pagar
+        $sum = Payment::where([
+            ['credit_id', $creditId],
+            ['status', Payment::STATUS_PAID]
+        ])->select('abono')->sum('abono');
+        $deuda = $c->total - $sum;
+
+        if ($deuda === 0.0) {
+            return $this->err("Los cobros de este crédito están completos");
+        }
+
+        //*Validamos que el abono que viene no sea mayor a la deuda
+        if ($request->abono > $deuda) {
+            return $this->err("El abono es mucho mayor a la deuda total de $$deuda");
+        }
+
+
+        //Hay dos caminos, puede existir deuda pero ya todos los pagos por defecto se han cobrado
         $lastPay = $this->lastPay($creditId);
+        if (!$lastPay && $deuda > 0) {
+            Payment::create([
+                'credit_id' => $c->id,
+                'abono' => $request->abono,
+                'status' => Payment::STATUS_PAID,
+                'date' => Carbon::now(),
+                'total' => $deuda,
+                'date_payment' => Carbon::now(),
+                'user_id' => $request->user()->id,
+                'description' => 'PAGO ADICIONAL'
+            ]);
+            return $this->ok("Pago adicional procesado");
+        }
 
+        // El otro caso es cuando aun hay pagos, disponibles que actualizar
 
-        // calculo de pagos aun no procesados
+        // calculo de pagos aun no procesados|actualizados
         $abono = doubleval($request->abono);
         $cuota = $lastPay->total;
         $userId = $request->user()->id;
