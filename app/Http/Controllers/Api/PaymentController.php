@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Credit;
 use App\Http\Controllers\ApiController;
+use App\Jobs\ProcessMora;
 use App\Payment;
 use App\Person;
 use Carbon\Carbon;
@@ -40,7 +41,7 @@ class PaymentController extends ApiController
     public function pay(Request $request, $creditId)
     {
         $request->validate(['pays' => 'array|required']);
-
+        $returnPays = [];
         $c = Credit::find($creditId);
         if (!$c) {
             return $this->err("El crédito no existe");
@@ -56,15 +57,17 @@ class PaymentController extends ApiController
                 $pay->description = 'PAGO EXITOSO';
                 $count++;
                 $pay->save();
+                array_push($returnPays, $pay);
             }
         }
-        return $this->success("$count pagos procesados");
+        ProcessMora::dispatchAfterResponse($c);
+        return $this->data($returnPays);
     }
 
     public function abono(Request $request, $creditId)
     {
         $request->validate(['abono' => 'required']);
-
+        $returnPays = [];
         $c = Credit::find($creditId);
         if (!$c) {
             return $this->err("El crédito no existe");
@@ -86,11 +89,10 @@ class PaymentController extends ApiController
             return $this->err("El abono es mucho mayor a la deuda total de $$deuda");
         }
 
-
         //Hay dos caminos, puede existir deuda pero ya todos los pagos por defecto se han cobrado
         $lastPay = $this->lastPay($creditId);
         if (!$lastPay && $deuda > 0) {
-            Payment::create([
+            $p = Payment::create([
                 'credit_id' => $c->id,
                 'abono' => $request->abono,
                 'status' => Payment::STATUS_PAID,
@@ -100,46 +102,53 @@ class PaymentController extends ApiController
                 'user_id' => $request->user()->id,
                 'description' => 'PAGO ADICIONAL'
             ]);
-            return $this->ok("Pago adicional procesado");
+            array_push($returnPays, $p);
+            return $this->data($returnPays);
         }
 
         // El otro caso es cuando aun hay pagos, disponibles que actualizar
-
         // calculo de pagos aun no procesados|actualizados
         $abono = doubleval($request->abono);
         $cuota = $lastPay->total;
         $userId = $request->user()->id;
 
-        /*$moras = Payment::where([
-            ['credit_id', $creditId],
-            ['mora', true]
-        ])->select('total', 'abono')->get();
-
-        return $this->ok($moras);*/
-
-
         // si es menor, puede ser que sea un atraso
         if ($abono < $cuota) {
-            $this->savePay($userId, $creditId, $abono, true);
+            $p = $this->savePay($userId, $creditId, $abono, true);
+            array_push($returnPays, $p);
         } else if ($abono > $cuota) {
-            $nPagos = $abono / $cuota; // numero de pagos
-            for ($i = 0; $i < intval($nPagos); $i++) {
-                if ($i === 0) {
-                    $tempAbono = intval($nPagos) * $cuota;
-                    $abono = $abono - $tempAbono;
-                    $this->savePay($userId, $creditId, $tempAbono);
-                } else {
-                    $this->savePay($userId, $creditId, 0);
+            $mora = Payment::where([
+                ['credit_id', $creditId],
+                ['mora', true]
+            ])->count();
+
+            if ($mora > 0) { // si tiene mora no se puede considerar un adelanto
+                $p = $this->savePay($userId, $creditId, $abono);
+                array_push($returnPays, $p);
+            } else { // si no tiene mora, es un adelanto
+                $nPagos = $abono / $cuota; // numero de pagos
+                for ($i = 0; $i < intval($nPagos); $i++) {
+                    if ($i === 0) {
+                        $tempAbono = intval($nPagos) * $cuota;
+                        $abono = $abono - $tempAbono;
+                        $p = $this->savePay($userId, $creditId, $tempAbono);
+                        array_push($returnPays, $p);
+                    } else {
+                        $p = $this->savePay($userId, $creditId, 0);
+                        array_push($returnPays, $p);
+                    }
+                }
+                if ($abono > 0) {
+                    $p = $this->savePay($userId, $creditId, $abono);
+                    array_push($returnPays, $p);
                 }
             }
-            if ($abono > 0) {
-                $this->savePay($userId, $creditId, $abono);
-            }
         } else {
-            $this->savePay($userId, $creditId);
+            $p = $this->savePay($userId, $creditId);
+            array_push($returnPays, $p);
         }
-
-        return $this->success("Pago procesado con éxito!");
+        ProcessMora::dispatchAfterResponse($c);
+        return $this->data($returnPays);
     }
 
     private function savePay($userId, $creditId, $abono = null, $mora = false)
@@ -151,7 +160,6 @@ class PaymentController extends ApiController
         }
         if ($mora) {
             $p->mora = 1;
-            $p->dias_mora = 1;
             $p->description = "COBRO CON MORA";
         } else {
             $p->description = "COBRO EXITOSO";
@@ -159,6 +167,8 @@ class PaymentController extends ApiController
         $p->user_id = $userId;
         $p->date_payment = Carbon::now();
         $p->save();
+
+        return $p;
     }
 
     private function lastPay($creditId)

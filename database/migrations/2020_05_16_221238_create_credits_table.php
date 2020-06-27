@@ -43,6 +43,8 @@ class CreateCreditsTable extends Migration
             $table->string('prenda_img', 60)->nullable();
             $table->string('prenda_detail', 150)->nullable();
 
+            $table->smallInteger('mora')->default(0);
+
             $table->foreign('zone_id')->references('id')->on('zones');
             $table->foreign('user_id')->references('id')->on('users');
             $table->foreign('person_id')->references('id')->on('persons');
