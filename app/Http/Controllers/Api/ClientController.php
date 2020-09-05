@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Credit;
 use App\Http\Controllers\ApiController;
 use App\Payment;
 use App\Person;
@@ -205,6 +206,12 @@ class ClientController extends ApiController
             $c->ref_a = url('/api/image/' . $c->ref_a);
         if ($c->ref_b)
             $c->ref_b = url('/api/image/' . $c->ref_b);
+
+        $c->active_credit = Credit::where([
+                ['person_id', $c->id],
+                ['status', Credit::STATUS_ACTIVO]
+            ])->count() > 0;
+
         return $this->showOne($c);
     }
 

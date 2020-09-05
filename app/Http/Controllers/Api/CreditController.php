@@ -7,7 +7,6 @@ use App\Http\Controllers\ApiController;
 use App\Payment;
 use App\Person;
 use App\Traits\UploadTrait;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -20,14 +19,16 @@ class CreditController extends ApiController
         $this->middleware('auth:api');
     }
 
-    public function store(Request $request) {
+    //*Http
+    public function store(Request $request)
+    {//store a new credit
 
         $request->validate([
             'person_id' => 'required',
-            'monto'=> 'required',
-            'utilidad'=> 'required',
-            'plazo' => 'required|in:'.$this->getValidTerms(),
-            'cobro'=> 'required|in:'.$this->getValidPays(),
+            'monto' => 'required',
+            'utilidad' => 'required',
+            'plazo' => 'required|in:' . $this->getValidTerms(),
+            'cobro' => 'required|in:' . $this->getValidPays(),
             'prenda_img' => 'nullable|image|mimes:jpeg,png,jpg',
             'prenda_detail' => 'nullable|string|max:150',
             'f_inicio' => 'nullable|date_format:Y-m-d'
@@ -75,24 +76,39 @@ class CreditController extends ApiController
         }
     }
 
-    private function getValidTerms() {  // plazos validos
-        return
-            Credit::PLAZO_SEMANAL.','.
-            Credit::PLAZO_QUINCENAL.','.
-            Credit::PLAZO_MENSUAL.','.
-            Credit::PLAZO_MES_Y_MEDIO.','.
-            Credit::PLAZO_OOS_MESES.'';
+    public function showForClient($clientId)
+    {
+        $c = Person::findOrFail($clientId);
+
+        $credits = Credit::where([
+            ['person_id', $c->id],
+        ])->select('f_inicio', 'f_fin', 'mora', 'total', 'plazo', 'cobro', "status")->get();
+
+        return $this->showAll($credits);
     }
 
-    private function getValidPays() {
+    //*Validations
+    private function getValidTerms()
+    {  // plazos validos
         return
-            Credit::COBRO_DIARIO.','.
-            Credit::COBRO_MENSUAL.','.
-            Credit::COBRO_SEMANAL.','.
+            Credit::PLAZO_SEMANAL . ',' .
+            Credit::PLAZO_QUINCENAL . ',' .
+            Credit::PLAZO_MENSUAL . ',' .
+            Credit::PLAZO_MES_Y_MEDIO . ',' .
+            Credit::PLAZO_OOS_MESES . '';
+    }
+
+    private function getValidPays()
+    {
+        return
+            Credit::COBRO_DIARIO . ',' .
+            Credit::COBRO_MENSUAL . ',' .
+            Credit::COBRO_SEMANAL . ',' .
             Credit::COBRO_QUINCENAL;
     }
 
-    public function messages() {
+    private function messages()
+    {
         return [
             'person_id.required' => 'No se ha proporcionado un cliente',
             'plazo.required' => 'Es necesario definir el plazo',
@@ -104,16 +120,16 @@ class CreditController extends ApiController
         ];
     }
 
-    public function  hasActiveCredit($person_id) {
+    //*Functions
+    private function hasActiveCredit($person_id)
+    {
         $c = Credit::select('id')->where([
             ['person_id', $person_id],
             ['status', Credit::STATUS_ACTIVO]
         ])->first();
 
-        return ($c!=null);
+        return ($c != null);
     }
-
-    // functions
 
     public function setPayments(Credit $c)
     {
@@ -125,7 +141,6 @@ class CreditController extends ApiController
 
         for ($i = 0; $i < $nPagos; $i++) {
             Payment::create([
-                'number' => ($i + 1),
                 'credit_id' => $c->id,
                 'total' => $c->_pagosDe,
                 'abono' => $c->_pagosDe,
@@ -138,7 +153,6 @@ class CreditController extends ApiController
         if ($c->_pagosDeLast !== 0) {
             $np = count($c->pays);
             Payment::create([
-                'number' => $np,
                 'credit_id' => $c->id,
                 'total' => $c->_pagosDeLast,
                 'abono' => $c->_pagosDeLast,
@@ -147,115 +161,5 @@ class CreditController extends ApiController
                 'description' => 'Pendiente'
             ]);
         }
-    }
-
-    public function calcCredit($plazo, $mount, $cobro) {
-        $diasPlazo = Credit::diasPlazo($plazo);
-        $diasCobro = Credit::diasCobro($cobro);
-        $numPagos = intval($diasPlazo / $diasCobro );
-        $numPagosReal = $numPagos;
-
-        $pagosDe = round($mount / $numPagos, 2);
-        $pagosDeLast = 0;
-        $totalIdeal = $pagosDe * $numPagos;
-
-        if($totalIdeal !== $mount) {
-            if($totalIdeal < $mount) {
-                $diferencia = $mount - $totalIdeal;
-                $pagosDeLast = round($pagosDe + $diferencia, 2);
-                $numPagos--;
-            } else {
-                $diferencia = $totalIdeal - $mount;
-                $pagosDeLast = round($pagosDe - $diferencia, 2);
-                $numPagos--;
-            }
-        }
-
-        if($pagosDeLast === 0) {
-            $description = $numPagos.' pago(s) de '.$pagosDe;
-        } else {
-            $description = $numPagos.' pago(s) de '.$pagosDe.' + un pago de '.$pagosDeLast;
-        }
-
-        $description.= ' | Plazo: '.$plazo. ', Cobro: '.$cobro;
-
-        return([
-            'nPagos' => $numPagosReal,
-            'pagosDe' => $pagosDe,
-            'pagosDeLast' => $pagosDeLast,
-            'description'=> $description]);
-    }
-
-    public function storePayments($credit_id, $calc, $fInit, $fEnd, $cobro){
-        $date = Carbon::parse($fInit);
-        $n_pagos = $calc['nPagos'];
-
-        if ($calc['pagosDeLast'] !== 0) {
-            $n_pagos=$n_pagos-1;
-        }
-
-        $pay=1;
-        for($i = 0; $i < $n_pagos; $i++) {
-            if ($i === 0) {
-                $date_calc = $date;
-            } else {
-                $date_calc = Credit::addDays(Credit::diasCobro($cobro), $date);
-            }
-            Payment::create([
-                'number' => $pay,
-                'credit_id' => $credit_id,
-                'total' => $calc['pagosDe'],
-                'status' => Payment::STATUS_ACTIVE,
-                'date' => $date_calc->format('Y-m-d'),
-                'description' => 'Pendiente'
-            ]);
-            $date = $date_calc;
-            $pay++;
-        }
-
-        if($calc['pagosDeLast'] !== 0) {
-            $date_calc = Credit::addDays(Credit::diasCobro($cobro), $date);
-            Payment::create([
-                'number' => $pay,
-                'credit_id' => $credit_id,
-                'total' => $calc['pagosDeLast'],
-                'status' => Payment::STATUS_ACTIVE,
-                'date' => $date_calc->format('Y-m-d'),
-                'description' => 'Pendiente'
-            ]);
-        }
-    }
-
-    public function cancelCredit(Request $request, $id){
-
-        $request->validate([
-            'description' => 'required|string|max:100'
-        ], [
-            'description.required' => 'Ingrese el motivo para anular!'
-        ]);
-
-        $c = Credit::findOrFail($id);
-        $c->description = $request->get('description');
-
-        if( $c->user_id !== $request->user()->id && !$request->user()->isAdmin() ) {
-            return 'No tienes permiso para realizar esta acción';
-        }
-
-        $payments_numbers = Payment::select('id')
-            ->where('credit_id', $c->id)
-            ->where('status', Payment::STATUS_FINISH)->count();
-
-        if($payments_numbers > 0) {
-            return 'Este crédito tiene pagos registrados, no puede ser anulado';
-        }
-
-        $c->status = Credit::STATUS_ANULADO;
-        if ($c->save()) {
-            Payment::select('id')->where('credit_id', $c->id)->delete();
-            return $c;
-        } else {
-            return "No se ha podido anular este crédito";
-        }
-
     }
 }
