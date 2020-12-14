@@ -60,7 +60,8 @@ class Install extends Command
         Artisan::call('db:wipe');
         $this->info('Creando migraciones y semillas...');
         Artisan::call('migrate', ['--seed'=> 'default']);
-        $this->createPersonalClient();
+        $this->createPersonalClient();    
+        Artisan::call('passport:keys');        
         $this->line('Proceso finalizado con éxito');
     }
 
