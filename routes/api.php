@@ -26,5 +26,10 @@ Route::namespace('Api')->group(function () {
 
     Route::get('payment/only/{id}', 'PaymentController@showByCredit');
     Route::apiResource('payment', 'PaymentController')->only(['index', 'show', 'update', 'destroy']);
+
+    // gastos
+    // expenses
+    Route::get('/expense/info', 'ExpenseController@info');
+    Route::apiResource('expense', 'ExpenseController')->except(['update']);
 });
 Route::get('image/{path}/{filename}', 'AdminController@viewImg')->name('show-image');
